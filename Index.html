@@ -1,0 +1,301 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CloudShare - ระบบแจกไฟล์ออนไลน์</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen font-sans">
+
+  <!-- Navigation Bar -->
+  <nav class="bg-slate-800/80 backdrop-blur border-b border-slate-700 sticky top-0 z-50 px-6 py-4">
+    <div class="max-w-6xl mx-auto flex justify-between items-center">
+      <div class="flex items-center gap-3">
+        <div class="bg-indigo-600 p-2.5 rounded-xl text-white shadow-lg shadow-indigo-500/30">
+          <i class="fa-solid fa-cloud-arrow-up text-xl"></i>
+        </div>
+        <div>
+          <h1 class="text-xl font-bold bg-gradient-to-r from-indigo-400 to-cyan-400 bg-clip-text text-transparent">CloudShare</h1>
+          <p class="text-[11px] text-slate-400">ระบบฝากและแจกไฟล์ออนไลน์</p>
+        </div>
+      </div>
+      <button onclick="toggleAdminModal()" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-lg border border-slate-600 transition flex items-center gap-2">
+        <i class="fa-solid fa-user-shield"></i> ผู้ดูแลระบบ
+      </button>
+    </div>
+  </nav>
+
+  <div class="max-w-6xl mx-auto p-6 space-y-8">
+
+    <!-- Upload Box -->
+    <div class="bg-slate-800 p-6 sm:p-8 rounded-2xl border border-slate-700/80 shadow-xl space-y-4">
+      <h2 class="text-lg font-semibold text-slate-100 flex items-center gap-2">
+        <i class="fa-solid fa-plus-circle text-indigo-400"></i> อัปโหลดไฟล์ใหม่ขึ้นระบบ
+      </h2>
+      
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="md:col-span-2">
+          <input type="file" id="fileInput" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2.5 file:px-4 file:rounded-xl file:border-0 file:text-sm file:font-medium file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 cursor-pointer bg-slate-900/50 rounded-xl border border-slate-700 p-1"/>
+        </div>
+        <div>
+          <select id="categorySelect" class="w-full bg-slate-900/50 border border-slate-700 text-slate-200 text-sm rounded-xl p-3 focus:outline-none focus:border-indigo-500">
+            <option value="ทั่วไป">ทั่วไป</option>
+            <option value="เอกสาร">เอกสาร</option>
+            <option value="โปรแกรม">โปรแกรม / ซอฟต์แวร์</option>
+            <option value="สื่อและวิดีโอ">สื่อ / รูปภาพ / วิดีโอ</option>
+            <option value="เพลง">เพลง / เสียง</option>
+          </select>
+        </div>
+      </div>
+
+      <button onclick="uploadFile()" id="btnUpload" class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-medium py-3 rounded-xl transition shadow-lg shadow-indigo-600/20 flex justify-center items-center gap-2">
+        <i class="fa-solid fa-cloud-arrow-up"></i> เริ่มการอัปโหลดไฟล์
+      </button>
+
+      <!-- Progress Bar -->
+      <div id="progressBox" class="hidden space-y-2 pt-2">
+        <div class="w-full bg-slate-900 rounded-full h-2.5 overflow-hidden border border-slate-700">
+          <div id="progressBar" class="bg-gradient-to-r from-indigo-500 to-cyan-400 h-2.5 rounded-full w-0 transition-all duration-300"></div>
+        </div>
+        <p id="progressText" class="text-xs text-slate-400 text-center font-mono">กำลังเตรียมการอัปโหลด...</p>
+      </div>
+    </div>
+
+    <!-- Search & Filter -->
+    <div class="flex flex-col sm:flex-row gap-4 justify-between items-center bg-slate-800/40 p-4 rounded-xl border border-slate-700/50">
+      <div class="relative w-full sm:w-72">
+        <i class="fa-solid fa-search absolute left-3.5 top-3 text-slate-400 text-sm"></i>
+        <input type="text" id="searchInput" oninput="renderFiles()" placeholder="ค้นหาชื่อไฟล์..." class="w-full bg-slate-800 border border-slate-700 text-slate-200 text-sm rounded-lg pl-9 pr-4 py-2 focus:outline-none focus:border-indigo-500">
+      </div>
+      <div class="flex items-center gap-2 w-full sm:w-auto">
+        <button onclick="fetchFiles()" class="text-xs bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700 px-3 py-2 rounded-lg transition flex items-center gap-1.5 w-full sm:w-auto justify-center">
+          <i class="fa-solid fa-rotate"></i> รีเฟรชรายการ
+        </button>
+      </div>
+    </div>
+
+    <!-- File List Section -->
+    <div class="space-y-4">
+      <h3 class="text-md font-semibold text-slate-300 flex items-center gap-2">
+        <i class="fa-solid fa-folder-open text-indigo-400"></i> รายการไฟล์สาธารณะทั้งหมด
+      </h3>
+      
+      <div id="fileContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div class="col-span-full text-center py-12 text-slate-400 space-y-2">
+          <i class="fa-solid fa-spinner fa-spin text-2xl text-indigo-400"></i>
+          <p class="text-sm">กำลังโหลดข้อมูลจากฐานข้อมูล...</p>
+        </div>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Admin Modal -->
+  <div id="adminModal" class="fixed inset-0 bg-black/70 backdrop-blur-sm hidden z-50 flex items-center justify-center p-4">
+    <div class="bg-slate-800 border border-slate-700 rounded-2xl w-full max-w-md p-6 space-y-5 shadow-2xl">
+      <div class="flex justify-between items-center border-b border-slate-700 pb-3">
+        <h3 class="text-lg font-bold text-slate-100 flex items-center gap-2">
+          <i class="fa-solid fa-lock text-amber-400"></i> เข้าสู่ระบบผู้ดูแลระบบ
+        </h3>
+        <button onclick="toggleAdminModal()" class="text-slate-400 hover:text-white"><i class="fa-solid fa-xmark text-lg"></i></button>
+      </div>
+      <div class="space-y-3">
+        <label class="text-xs text-slate-300">กรอกรหัส Admin PIN (ค่าเริ่มต้น: 1234)</label>
+        <input type="password" id="adminPinInput" placeholder="••••" class="w-full bg-slate-900 border border-slate-700 text-center font-mono text-xl tracking-widest text-slate-100 rounded-xl p-3 focus:outline-none focus:border-indigo-500">
+      </div>
+      <button onclick="verifyAdmin()" class="w-full bg-amber-600 hover:bg-amber-500 text-white font-medium py-2.5 rounded-xl transition">
+        ยืนยันตัวตน
+      </button>
+    </div>
+  </div>
+
+  <script>
+    // ⚙️ การตั้งค่าระบบ Supabase จากบัญชีของคุณ
+    const SUPABASE_URL = 'https://hahlryzqioosfwvkzrdb.supabase.co';
+    const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhhaGxyeXpxaW9vc2Z3dmt6cmRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzMTUzNjEsImV4cCI6MjA1Nzg5MTM2MX0.9S4E7O3B_sT416u7TndfETh_nZ-_P55wN0T3H0KjU30';
+    const BUCKET_NAME = 'cloudshare-files';
+
+    const db = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    let allFilesData = [];
+    let isAdminLoggedIn = false;
+
+    window.onload = () => {
+      fetchFiles();
+    };
+
+    // ดึงข้อมูลไฟล์ทั้งหมดจาก Database
+    async function fetchFiles() {
+      const container = document.getElementById('fileContainer');
+      
+      const { data: files, error } = await db
+        .from('files')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        container.innerHTML = `<div class="col-span-full bg-red-500/10 border border-red-500/30 text-red-400 p-4 rounded-xl text-center text-sm">เกิดข้อผิดพลาดในการดึงข้อมูล: ${error.message}</div>`;
+        return;
+      }
+
+      allFilesData = files || [];
+      renderFiles();
+    }
+
+    // แสดงผลไฟล์บนหน้าเว็บ
+    function renderFiles() {
+      const container = document.getElementById('fileContainer');
+      const searchKeyword = document.getElementById('searchInput').value.toLowerCase();
+
+      const filtered = allFilesData.filter(f => f.file_name.toLowerCase().includes(searchKeyword));
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full bg-slate-800/50 border border-slate-700/50 rounded-2xl p-8 text-center text-slate-400 space-y-2">
+            <i class="fa-solid fa-folder-open text-3xl text-slate-500"></i>
+            <p class="text-sm">ไม่พบไฟล์ในระบบ</p>
+          </div>
+        `;
+        return;
+      }
+
+      container.innerHTML = filtered.map(file => `
+        <div class="bg-slate-800/80 border border-slate-700/80 hover:border-slate-600 p-5 rounded-2xl flex flex-col justify-between gap-4 transition group">
+          <div class="space-y-2">
+            <div class="flex justify-between items-start gap-2">
+              <span class="font-medium text-slate-100 group-hover:text-indigo-300 transition break-all">${file.file_name}</span>
+              <span class="text-[10px] bg-indigo-500/10 border border-indigo-500/30 text-indigo-300 px-2.5 py-1 rounded-full shrink-0">${file.category}</span>
+            </div>
+            <p class="text-xs text-slate-400 flex items-center gap-3">
+              <span><i class="fa-solid fa-hard-drive text-slate-500"></i> ${(file.file_size / (1024 * 1024)).toFixed(2)} MB</span>
+              <span><i class="fa-solid fa-download text-slate-500"></i> โหลดแล้ว ${file.download_count} ครั้ง</span>
+            </p>
+          </div>
+
+          <div class="flex gap-2 border-t border-slate-700/50 pt-3">
+            <button onclick="downloadFile('${file.id}', '${file.file_url}', ${file.download_count})" class="flex-1 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-medium py-2.5 rounded-xl transition flex justify-center items-center gap-1.5 shadow-md shadow-indigo-600/20">
+              <i class="fa-solid fa-download"></i> ดาวน์โหลด
+            </button>
+            ${isAdminLoggedIn ? `
+              <button onclick="deleteFile('${file.id}', '${file.storage_path}')" class="bg-red-500/20 hover:bg-red-500/30 text-red-400 text-xs px-3 py-2.5 rounded-xl transition border border-red-500/30" title="ลบไฟล์">
+                <i class="fa-solid fa-trash-can"></i>
+              </button>
+            ` : ''}
+          </div>
+        </div>
+      `).join('');
+    }
+
+    // ฟังก์ชันอัปโหลดไฟล์จริงเข้า Cloud Storage + เพิ่มบันทึกใน Database
+    async function uploadFile() {
+      const fileInput = document.getElementById('fileInput');
+      const category = document.getElementById('categorySelect').value;
+      const file = fileInput.files[0];
+
+      if (!file) {
+        alert('กรุณาเลือกไฟล์ที่ต้องการอัปโหลด');
+        return;
+      }
+
+      const btnUpload = document.getElementById('btnUpload');
+      const progressBox = document.getElementById('progressBox');
+      const progressBar = document.getElementById('progressBar');
+      const progressText = document.getElementById('progressText');
+
+      btnUpload.disabled = true;
+      btnUpload.classList.add('opacity-50');
+      progressBox.classList.remove('hidden');
+      progressBar.style.width = '30%';
+      progressText.innerText = 'กำลังส่งไฟล์ขึ้น Cloud Storage...';
+
+      // 1. อัปโหลดเข้า Supabase Storage Bucket
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_');
+      const filePath = `${Date.now()}_${cleanFileName}`;
+
+      const { data: storageData, error: storageError } = await db.storage
+        .from(BUCKET_NAME)
+        .upload(filePath, file);
+
+      if (storageError) {
+        alert('อัปโหลดไฟล์ล้มเหลว: ' + storageError.message);
+        btnUpload.disabled = false;
+        btnUpload.classList.remove('opacity-50');
+        progressBox.classList.add('hidden');
+        return;
+      }
+
+      progressBar.style.width = '75%';
+      progressText.innerText = 'กำลังบันทึกข้อมูลเข้าสู่ฐานข้อมูล...';
+
+      // 2. ดึง Public URL ของไฟล์
+      const { data: urlData } = db.storage.from(BUCKET_NAME).getPublicUrl(filePath);
+
+      // 3. บันทึกรายละเอียดลง Database
+      const { error: dbError } = await db.from('files').insert([
+        {
+          file_name: file.name,
+          file_size: file.size,
+          category: category,
+          file_url: urlData.publicUrl,
+          storage_path: filePath,
+          is_public: true
+        }
+      ]);
+
+      if (dbError) {
+        alert('บันทึกข้อมูลล้มเหลว: ' + dbError.message);
+      } else {
+        progressBar.style.width = '100%';
+        progressText.innerText = 'อัปโหลดเสร็จสมบูรณ์!';
+        fileInput.value = '';
+        setTimeout(() => {
+          progressBox.classList.add('hidden');
+          btnUpload.disabled = false;
+          btnUpload.classList.remove('opacity-50');
+          fetchFiles(); // โหลดรายการไฟล์ใหม่
+        }, 800);
+      }
+    }
+
+    // ฟังก์ชันเปิดดาวน์โหลด + บวกยอดดาวน์โหลดเพิ่มขึ้น 1
+    async function downloadFile(id, url, currentCount) {
+      await db.from('files').update({ download_count: currentCount + 1 }).eq('id', id);
+      window.open(url, '_blank');
+      fetchFiles();
+    }
+
+    // ฟังก์ชันลบไฟล์ (เฉพาะ Admin)
+    async function deleteFile(id, storagePath) {
+      if (!confirm('คุณแน่ใจหรือไม่ว่าต้องการลบไฟล์นี้อย่างถาวร?')) return;
+
+      // ลบจาก Storage
+      await db.storage.from(BUCKET_NAME).remove([storagePath]);
+      // ลบจาก Database
+      await db.from('files').delete().eq('id', id);
+
+      fetchFiles();
+    }
+
+    // เปิด-ปิด Modal Admin
+    function toggleAdminModal() {
+      const modal = document.getElementById('adminModal');
+      modal.classList.toggle('hidden');
+    }
+
+    // ตรวจสอบ PIN Admin
+    function verifyAdmin() {
+      const pin = document.getElementById('adminPinInput').value;
+      if (pin === '1234') {
+        isAdminLoggedIn = true;
+        alert('เข้าสู่ระบบผู้ดูแลระบบสำเร็จ!');
+        toggleAdminModal();
+        renderFiles();
+      } else {
+        alert('รหัส PIN ไม่ถูกต้อง!');
+      }
+    }
+  </script>
+</body>
+</html>
