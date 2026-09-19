@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <title>CloudShare - อัปโหลดไฟล์</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js"></script>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen">
+  <nav class="bg-slate-800 p-4 border-b border-slate-700 flex justify-between items-center px-8">
+    <a href="index.html" class="text-xl font-bold text-indigo-400">CloudShare</a>
+    <a href="index.html" class="text-slate-200 hover:text-indigo-400">หน้าแรก</a>
+  </nav>
+
+  <div class="max-w-xl mx-auto p-6 mt-10 bg-slate-800 rounded-2xl border border-slate-700 space-y-4">
+    <h1 class="text-xl font-bold">อัปโหลดไฟล์ใหม่</h1>
+    <input type="file" id="fileInput" class="block w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:bg-indigo-600 file:text-white hover:file:bg-indigo-500 bg-slate-900 rounded-xl p-2" />
+    
+    <button onclick="upload()" id="btnUpload" class="w-full bg-indigo-600 hover:bg-indigo-500 py-3 rounded-xl font-semibold">
+      เริ่มอัปโหลด
+    </button>
+  </div>
+
+  <script>
+    async function upload() {
+      const file = document.getElementById('fileInput').files[0];
+      if (!file) return alert('กรุณาเลือกไฟล์');
+
+      const btn = document.getElementById('btnUpload');
+      btn.disabled = true;
+      btn.innerText = 'กำลังอัปโหลด...';
+
+      const filePath = `${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')}`;
+
+      // Upload to Storage
+      const { error: storageErr } = await db.storage.from(BUCKET_NAME).upload(filePath, file);
+      if (storageErr) {
+        alert('อัปโหลดล้มเหลว: ' + storageErr.message);
+        btn.disabled = false;
+        btn.innerText = 'เริ่มอัปโหลด';
+        return;
+      }
+
+      // Get Public URL
+      const { data: urlData } = db.storage.from(BUCKET_NAME).getPublicUrl(filePath);
+
+      // Save Metadata to DB
+      await db.from('files').insert([{
+        file_name: file.name,
+        file_size: file.size,
+        file_url: urlData.publicUrl,
+        storage_path: filePath
+      }]);
+
+      alert('อัปโหลดสำเร็จ!');
+      window.location.href = 'index.html'; // กลับหน้าแรก
+    }
+  </script>
+</body>
+</html>
